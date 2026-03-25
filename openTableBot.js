@@ -160,6 +160,13 @@
   async function completeReservation() {
     console.log("booking page");
 
+    // Handle "You already have a reservation around this time" modal
+    const continueBtn = await waitForElement("[data-test='double-trouble-modal-continue-button']", 5000);
+    if (continueBtn) {
+      console.log("Double trouble modal detected, clicking Continue");
+      continueBtn.click();
+    }
+
     const completeReservationButton = await waitForElement("[data-test='complete-reservation-button']");
     if (!completeReservationButton) {
       console.log("complete-reservation-button not found after waiting");
@@ -179,6 +186,13 @@
       return;
     }
 
+    console.log("Clicking complete reservation button");
+    completeReservationButton.click();
+  }
+
+  async function handleSeatingOptions() {
+    console.log("seating options page");
+
     // Handle "You already have a reservation around this time" modal
     const continueBtn = await waitForElement("[data-test='double-trouble-modal-continue-button']", 5000);
     if (continueBtn) {
@@ -186,12 +200,6 @@
       continueBtn.click();
     }
 
-    console.log("Clicking complete reservation button");
-    completeReservationButton.click();
-  }
-
-  async function handleSeatingOptions() {
-    console.log("seating options page");
     const firstBtn = await waitForElement('[data-test*="seatingOption"][data-test$="-button"]');
     if (!firstBtn) {
       console.log("No seating option buttons found after waiting");
