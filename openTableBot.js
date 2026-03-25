@@ -245,7 +245,7 @@
     }
   }
 
- async function kickedOut(wait) {
+  async function kickedOut(wait) {
     const url = await GM.getValue("url", null);
     if (!url) {
         console.log(`no url to back to ${url}`);
@@ -257,16 +257,16 @@
     setTimeout(() => {
       window.location.assign(url)
     }, wait ?? 1000 * 60 * 5)
- }
+  }
 
- function execute(func) {
-     //somtimes user script is injected after the page is loaded, and sometimes before.
-     if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", func);
-     } else {
-          func();
-     }
- }
+  function execute(func) {
+    //somtimes user script is injected after the page is loaded, and sometimes before.
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", func);
+    } else {
+      func();
+    }
+  }
 
   const el = document.createElement("div");
   el.style.position = "relative";
