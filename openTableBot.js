@@ -77,6 +77,19 @@
      return `${min} min and ${sec} seconds`
   }
 
+  function waitForElement(selector, timeout = 15000, interval = 500) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const check = () => {
+        const el = document.querySelector(selector);
+        if (el) return resolve(el);
+        if (Date.now() - start > timeout) return resolve(null);
+        setTimeout(check, interval);
+      };
+      check();
+    });
+  }
+
   function startCheckingAgain() {
     const randomInterval = randomIntervalFunc();
     console.log(
@@ -93,9 +106,8 @@
   async function checkForTimeSlots() {
     console.log("checking for time slots");
     let result;
-    //wait for XHR to load
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    const slots = document.querySelector("[data-test='time-slots']");
+    const slots = await waitForElement("[data-test='time-slots']");
+    if (!slots) console.log("time-slots element not found after waiting");
     for (const child of slots?.children ?? []) {
       if (child.firstChild.ariaLabel) {
         const slotTime = child.firstChild.innerText.trim();
@@ -130,21 +142,21 @@
 
   async function completeReservation() {
     console.log("booking page");
-    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Handle "You already have a reservation around this time" modal
-    const continueBtn = document.querySelector('[data-test="double-trouble-modal-continue-button"]');
+    // Check for it quickly — it may or may not appear
+    const continueBtn = await waitForElement("[data-test='double-trouble-modal-continue-button']", 5000);
     if (continueBtn) {
       console.log("Double trouble modal detected, clicking Continue");
       continueBtn.click();
-      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
-    const completeReservationButton = document.querySelector(
-      "[data-test='complete-reservation-button']"
-    );
+    const completeReservationButton = await waitForElement("[data-test='complete-reservation-button']");
     if (completeReservationButton) {
+      console.log("Clicking complete reservation button");
       completeReservationButton.click();
+    } else {
+      console.log("complete-reservation-button not found after waiting");
     }
   }
 
