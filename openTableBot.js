@@ -8,6 +8,8 @@
 // @grant        window.close
 // @grant        GM.setValue
 // @grant        GM.getValue
+// @grant        GM.xmlHttpRequest
+// @connect      localhost
 // @run-at       document-end
 // ==/UserScript==
 
@@ -41,27 +43,31 @@
     return slot >= start && slot <= end;
   }
 
-  async function sendEmail(message, href) {
-    const options = {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ message, href }),
-    };
-    try {
-      const response = await fetch(
-        "http://localhost:8080/reservation",
-        options
-      );
-      !response.ok
-        ? console.log("Email send failed")
-        : console.log("Email send success!");
-      const data = await response.json();
-      console.log(data);
-    } catch (e) {
-      console.log("Failed to send data to server", e);
-    }
+  function sendEmail(message, href) {
+    return new Promise((resolve, reject) => {
+      GM.xmlHttpRequest({
+        method: "POST",
+        url: "http://localhost:8080/reservation",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        data: JSON.stringify({ message, href }),
+        onload: function (response) {
+          if (response.status >= 200 && response.status < 300) {
+            console.log("Email send success!");
+            console.log(JSON.parse(response.responseText));
+            resolve();
+          } else {
+            console.log("Email send failed", response.status);
+            resolve();
+          }
+        },
+        onerror: function (e) {
+          console.log("Failed to send data to server", e);
+          reject(e);
+        },
+      });
+    });
   }
 
    function minAndSec(ms) {
