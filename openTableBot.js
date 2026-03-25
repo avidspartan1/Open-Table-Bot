@@ -16,6 +16,30 @@
 
   const minCheckTime = 45000;
   const maxCheckTime = 60000 * 2;
+  const targetStartTime = "5:30 PM";
+  const targetEndTime = "6:00 PM";
+
+  function parseTimeToMinutes(timeStr) {
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) {
+      console.warn(`Could not parse time: "${timeStr}"`);
+      return NaN;
+    }
+    let [, hours, minutes, period] = match;
+    hours = parseInt(hours, 10);
+    minutes = parseInt(minutes, 10);
+    if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+    if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  }
+
+  function isTimeInWindow(timeStr) {
+    const slot = parseTimeToMinutes(timeStr);
+    if (isNaN(slot)) return false;
+    const start = parseTimeToMinutes(targetStartTime);
+    const end = parseTimeToMinutes(targetEndTime);
+    return slot >= start && slot <= end;
+  }
 
   async function sendEmail(message, href) {
     const options = {
@@ -68,12 +92,20 @@
     const slots = document.querySelector("[data-test='time-slots']");
     for (const child of slots?.children ?? []) {
       if (child.firstChild.ariaLabel) {
+        const slotTime = child.firstChild.innerText.trim();
+
+        if (!isTimeInWindow(slotTime)) {
+          console.log(`Slot at ${slotTime} outside target window (${targetStartTime} - ${targetEndTime}), skipping`);
+          continue;
+        }
+
         result = `Reservation found! - ${new Date()}`;
-        const message = `Reservation available at ${child.firstChild.innerText}: ${child.firstChild.ariaLabel}`;
-        sendEmail(message, child.firstChild.href);
+        const message = `Reservation available at ${slotTime}: ${child.firstChild.ariaLabel}`;
+        await sendEmail(message, child.firstChild.href);
 
         //attempt to reserve via bot
         child.firstChild.click();
+        break;
       }
     }
 
@@ -104,7 +136,7 @@
     const url = await GM.getValue("url", null);
     if (!url) {
         console.log(`no url to back to ${url}`);
-        sendEmail('Got kicked out, no url to go back to!', window.location.href)
+        await sendEmail('Got kicked out, no url to go back to!', window.location.href)
         return
     }
     console.log(`got kicked out. Will try again in ${minAndSec(wait)}`)
@@ -128,7 +160,7 @@
   el.style.textAlign = "center";
   el.style.fontWeight = "bold";
   el.style.fontSize = "xx-large";
-  el.innerText = "🤖 Agent Running";
+  el.innerText = `🤖 Agent Running (${targetStartTime} - ${targetEndTime})`;
   el.style.backgroundColor = "lime";
 
   switch (true) {
