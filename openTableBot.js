@@ -137,7 +137,6 @@
         result = `Reservation found! - ${new Date()}`;
         await GM.setValue("lastClickedSlot", slotTime);
         await GM.setValue("lastClickedSlotHref", child.firstChild.href);
-        await GM.setValue("rejectedSlots", "[]");
 
         //attempt to reserve via bot
         child.firstChild.click();
@@ -167,7 +166,9 @@
       return;
     }
 
-    // Send notification — reaching this page means time + seating were valid
+    // Reaching this page means time + seating were valid — clear rejected slots
+    await GM.setValue("rejectedSlots", "[]");
+
     const slotTime = await GM.getValue("lastClickedSlot", "unknown");
     const slotHref = await GM.getValue("lastClickedSlotHref", window.location.href);
     const message = `Reservation available at ${slotTime}`;
