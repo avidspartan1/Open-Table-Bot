@@ -18,7 +18,7 @@
 
   const minCheckTime = 45000;
   const maxCheckTime = 60000 * 2;
-  const targetStartTime = "5:30 PM";
+  const targetStartTime = "5:15 PM";
   const targetEndTime = "6:00 PM";
 
   function parseTimeToMinutes(timeStr) {
@@ -111,6 +111,7 @@
 
         //attempt to reserve via bot
         child.firstChild.click();
+
         break;
       }
     }
@@ -129,7 +130,16 @@
 
   async function completeReservation() {
     console.log("booking page");
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Handle "You already have a reservation around this time" modal
+    const continueBtn = document.querySelector('[data-test="double-trouble-modal-continue-button"]');
+    if (continueBtn) {
+      console.log("Double trouble modal detected, clicking Continue");
+      continueBtn.click();
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
     const completeReservationButton = document.querySelector(
       "[data-test='complete-reservation-button']"
     );
