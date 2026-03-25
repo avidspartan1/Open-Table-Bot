@@ -20,6 +20,9 @@
   const maxCheckTime = 60000 * 2;
   const targetStartTime = "5:15 PM";
   const targetEndTime = "6:00 PM";
+  const autoBook = false;
+  const ignoreSeatingWords = ["outdoor"];
+  const rejectedSlotTimeout = 60 * 60 * 1000; // 1 hour
 
   function parseTimeToMinutes(timeStr) {
     const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -106,6 +109,15 @@
   async function checkForTimeSlots() {
     console.log("checking for time slots");
     let result;
+
+    // Load and filter expired rejected slots
+    const now = Date.now();
+    let rejectedSlots = JSON.parse(await GM.getValue("rejectedSlots", "[]"));
+    rejectedSlots = rejectedSlots.filter((s) => s.expiry > now);
+    await GM.setValue("rejectedSlots", JSON.stringify(rejectedSlots));
+    const rejectedTimes = rejectedSlots.map((s) => s.time);
+    if (rejectedTimes.length) console.log("Rejected slots:", rejectedTimes.join(", "));
+
     const slots = await waitForElement("[data-test='time-slots']");
     if (!slots) console.log("time-slots element not found after waiting");
     for (const child of slots?.children ?? []) {
@@ -117,9 +129,15 @@
           continue;
         }
 
+        if (rejectedTimes.includes(slotTime)) {
+          console.log(`Slot at ${slotTime} was rejected (bad seating options), skipping`);
+          continue;
+        }
+
         result = `Reservation found! - ${new Date()}`;
-        const message = `Reservation available at ${slotTime}: ${child.firstChild.ariaLabel}`;
-        await sendEmail(message, child.firstChild.href);
+        await GM.setValue("lastClickedSlot", slotTime);
+        await GM.setValue("lastClickedSlotHref", child.firstChild.href);
+        await GM.setValue("rejectedSlots", "[]");
 
         //attempt to reserve via bot
         child.firstChild.click();
@@ -143,20 +161,78 @@
   async function completeReservation() {
     console.log("booking page");
 
+    const completeReservationButton = await waitForElement("[data-test='complete-reservation-button']");
+    if (!completeReservationButton) {
+      console.log("complete-reservation-button not found after waiting");
+      return;
+    }
+
+    // Send notification — reaching this page means time + seating were valid
+    const slotTime = await GM.getValue("lastClickedSlot", "unknown");
+    const slotHref = await GM.getValue("lastClickedSlotHref", window.location.href);
+    const message = `Reservation available at ${slotTime}`;
+    await sendEmail(message, slotHref);
+
+    if (!autoBook) {
+      console.log("autoBook is disabled, not clicking complete reservation");
+      return;
+    }
+
     // Handle "You already have a reservation around this time" modal
-    // Check for it quickly — it may or may not appear
     const continueBtn = await waitForElement("[data-test='double-trouble-modal-continue-button']", 5000);
     if (continueBtn) {
       console.log("Double trouble modal detected, clicking Continue");
       continueBtn.click();
     }
 
-    const completeReservationButton = await waitForElement("[data-test='complete-reservation-button']");
-    if (completeReservationButton) {
-      console.log("Clicking complete reservation button");
-      completeReservationButton.click();
+    console.log("Clicking complete reservation button");
+    completeReservationButton.click();
+  }
+
+  async function handleSeatingOptions() {
+    console.log("seating options page");
+    const firstBtn = await waitForElement('[data-test*="seatingOption"][data-test$="-button"]');
+    if (!firstBtn) {
+      console.log("No seating option buttons found after waiting");
+      startCheckingAgain();
+      return;
+    }
+
+    const allButtons = document.querySelectorAll('[data-test*="seatingOption"][data-test$="-button"]');
+    console.log(`Found ${allButtons.length} seating option(s)`);
+
+    let selectedButton = null;
+    for (const btn of allButtons) {
+      const testAttr = btn.getAttribute("data-test").toLowerCase();
+      const isIgnored = ignoreSeatingWords.some((word) => testAttr.includes(word.toLowerCase()));
+      if (isIgnored) {
+        console.log(`Ignoring seating option: ${testAttr}`);
+        continue;
+      }
+      console.log(`Selecting seating option: ${testAttr}`);
+      selectedButton = btn;
+      break;
+    }
+
+    if (selectedButton) {
+      selectedButton.click();
     } else {
-      console.log("complete-reservation-button not found after waiting");
+      // All options matched ignore list — reject this slot
+      const slotTime = await GM.getValue("lastClickedSlot", null);
+      console.log(`All seating options ignored for slot ${slotTime}, rejecting`);
+      if (slotTime) {
+        const rejectedSlots = JSON.parse(await GM.getValue("rejectedSlots", "[]"));
+        rejectedSlots.push({ time: slotTime, expiry: Date.now() + rejectedSlotTimeout });
+        await GM.setValue("rejectedSlots", JSON.stringify(rejectedSlots));
+      }
+      const url = await GM.getValue("url", null);
+      if (url) {
+        console.log(`Navigating back to restaurant page: ${url}`);
+        window.location.assign(url);
+      } else {
+        console.log("No restaurant URL saved, reloading");
+        window.history.back();
+      }
     }
   }
 
@@ -201,7 +277,10 @@
           console.log('kicked out');
           execute(kickedOut)
           break
-      case window.location.pathname === "/booking/details": 
+      case window.location.pathname === "/booking/seating-options":
+          execute(handleSeatingOptions)
+          break
+      case window.location.pathname === "/booking/details":
           execute(completeReservation)
           break
       default:
