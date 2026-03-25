@@ -225,6 +225,17 @@
 
     if (selectedButton) {
       selectedButton.click();
+      // Clicking the seating option does a client-side (SPA) navigation,
+      // so Tampermonkey won't re-run the script. Poll for the URL change
+      // and call completeReservation directly.
+      const pollForBookingPage = setInterval(() => {
+        if (window.location.pathname === "/booking/details") {
+          clearInterval(pollForBookingPage);
+          completeReservation();
+        }
+      }, 300);
+      // Stop polling after 15s as a safety net
+      setTimeout(() => clearInterval(pollForBookingPage), 15000);
     } else {
       // All options matched ignore list — reject this slot
       const slotTime = await GM.getValue("lastClickedSlot", null);
